@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: pacman
-          image: 339712888957.dkr.ecr.us-east-1.amazonaws.com/pacman-shalom2025:0414d70
+          image: 339712888957.dkr.ecr.us-east-1.amazonaws.com/pacman-shalom2025:d82ecc8
           ports:
             - containerPort: 3000
           env:
