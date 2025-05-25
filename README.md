@@ -1,141 +1,97 @@
-# 🎮 Pacman on AWS – Cloud-Native Deployment
+# 🕹️ Pacman on AWS EKS with CI/CD and MongoDB
 
-This repository contains a fully automated deployment of the classic [Pacman Game](https://github.com/font/pacman) using a modern cloud-native stack:
-- Kubernetes (EKS)
-- MongoDB (StatefulSet)
-- Docker (ECR)
-- CI/CD with CodePipeline & CodeBuild
-- Terraform (for infrastructure as code)
+This project deploys the classic Pacman game as a containerized Node.js application on AWS using a complete CI/CD pipeline, Kubernetes (EKS), MongoDB StatefulSet with persistent EBS storage, and Terraform for infrastructure provisioning.
 
 ---
 
-## 🧠 Overview
+## 📦 Project Stack
 
-Pacman is a browser-based arcade game implemented in Node.js. This project packages and deploys the application with AWS infrastructure, applying production-level best practices.
-
----
-
-## ⚙️ Tech Stack
-
-| Component          | Technology                      |
-|--------------------|----------------------------------|
-| Infrastructure     | Terraform                       |
-| Cluster            | Amazon EKS                      |
-| CI/CD              | AWS CodePipeline & CodeBuild    |
-| App Container      | Docker (Node.js App)            |
-| Image Registry     | Amazon ECR                      |
-| Database           | MongoDB (K8s StatefulSet + PVC) |
-| Storage            | AWS EBS with gp3                |
-| Load Balancer      | Kubernetes LoadBalancer Service |
+| Layer         | Technology                                    |
+|--------------|-----------------------------------------------|
+| Cloud        | AWS (EKS, ECR, CodeBuild, CodePipeline, IAM) |
+| Orchestration| Kubernetes (EKS)                              |
+| CI/CD        | GitHub → CodePipeline → CodeBuild → ECR       |
+| App          | Node.js Express (Pacman game)                 |
+| Database     | MongoDB on StatefulSet with PVC + EBS         |
+| Infra as Code| Terraform                                     |
 
 ---
 
-## 📁 Project Structure
+## 🚀 Deployment Architecture
 
-```bash
-pacman-terraform-k8s/
-├── terraform/                # Infrastructure as Code for EKS
-├── pacman-src/              # Application source
-│   ├── Dockerfile
-│   └── bin/server.js
-├── k8s-manifests/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── mongodb-statefulset.yaml
-│   └── gp3-storageclass.yaml
-├── buildspec.yml            # CI/CD configuration
-└── README.md                # Project documentation
+- `Deployment` → Pacman App in Node.js
+- `StatefulSet` → MongoDB pod with EBS volume
+- `PVC` → Uses gp3 StorageClass
+- `LoadBalancer` → Public access to Pacman app
+- `ClusterIP (None)` → MongoDB headless service
+
+### 🔗 App URL (via ELB)
+
+http://aaa6fdb6e12de4e89b080bd94fb38a94-1811374816.us-east-1.elb.amazonaws.com/
+
+---
+
+## 📷 System Architecture Diagram
+
+![Pacman Architecture](./Architecture.drawio.png)
+
+---
+
+## 🔌 Port & Network Configuration
+
+| Component      | Port  | Purpose                                 |
+|----------------|-------|-----------------------------------------|
+| Pacman Pod     | 3000  | Application exposed internally          |
+| Service LB     | 80    | Public access via LoadBalancer          |
+| MongoDB Pod    | 27017 | Internal DB connection via DNS service  |
+
+- DNS to MongoDB: `mongodb.default.svc.cluster.local:27017`
+- Environment variables:
+  - `MONGO_SERVICE_HOST=mongodb`
+  - `MONGO_DATABASE=pacman`
+
+---
+
+## 💾 MongoDB Persistence (EBS)
+
+- **PVC Name**: `mongo-persistent-storage-mongodb-0`
+- **StorageClass**: `gp3`
+- **VolumeBindingMode**: `WaitForFirstConsumer`
+- **Provisioner**: `ebs.csi.aws.com`
+- **IAM Role for CSI**: Enabled via Pod Identity
+- **AZ**: us-east-1a or us-east-1b (based on node placement)
+
+---
+
+## ⚙️ CI/CD Pipeline
+
+```mermaid
+graph TD
+  A[GitHub Push] --> B[CodePipeline]
+  B --> C[CodeBuild]
+  C --> D[Build Docker Image]
+  D --> E[Push to Amazon ECR]
+  E --> F[Deploy to EKS via kubectl apply]
 ```
 
 ---
 
-## 🚀 How It Works
+## 🧪 Validation
 
-### CI/CD Pipeline
-
-1. Code is pushed to GitHub.
-2. CodePipeline is triggered.
-3. CodeBuild builds the Docker image and pushes it to ECR.
-4. Kubernetes is updated via `kubectl apply`.
-
-### MongoDB Deployment
-
-- Deployed via StatefulSet.
-- Backed by a PersistentVolume (EBS).
-- Accessible internally via `mongodb:27017`.
+- ✅ `kubectl logs pacman` → `Connected to database server successfully`
+- ✅ ELB URL opens Pacman game
+- ✅ MongoDB collection `scores` created automatically
+- ✅ PVC is bound to an EBS volume (check via AWS console)
 
 ---
 
-## 🌐 Accessing the Application
+## 🗂️ Repository
 
-Find your LoadBalancer URL via:
-
-```bash
-kubectl get svc pacman-service
-```
-
-Visit `http://<EXTERNAL-IP>` in a browser to play the game.
+**GitHub**: https://github.com/sc122/pacman-terraform-k8s-shalom
 
 ---
 
-## 🧰 Developer Instructions
+## 👤 Author
 
-### Local Development (Optional)
-
-```bash
-cd pacman-src
-npm install
-node bin/server.js
-```
-
-### Build Docker Image Locally
-
-```bash
-docker build -t pacman .
-```
-
----
-
-## 🧱 Architecture Diagram
-
-```
-          ┌──────────────┐
-          │   GitHub     │
-          └────┬─────────┘
-               │
-        ┌──────▼─────┐
-        │ CodePipeline│
-        └──────┬─────┘
-               ▼
-        ┌─────────────┐
-        │ CodeBuild   │
-        └────┬────────┘
-             ▼
-      ┌─────────────┐
-      │   Amazon ECR│
-      └────┬────────┘
-           ▼
-    ┌──────────────┐
-    │   Amazon EKS │
-    │ ┌──────────┐ │
-    │ │ Pacman   │ │
-    │ └──────────┘ │
-    │ ┌──────────┐ │
-    │ │ MongoDB  │ │
-    │ └──────────┘ │
-    └──────────────┘
-```
-
----
-
-## ✅ Checklist
-
-- [x] EKS & VPC setup with Terraform
-- [x] MongoDB with StatefulSet & PVC
-- [x] CI/CD via AWS native services
-- [x] Docker image in ECR
-- [x] App exposed via LoadBalancer
-- [x] Code tested, structured, and documented
-
----
+**Shalom** (shalom2025)Course Project, AWS
 
